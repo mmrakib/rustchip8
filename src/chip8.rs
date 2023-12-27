@@ -1,6 +1,9 @@
 use std::{
     thread,
-    time
+    time,
+    fs,
+    io,
+    io::Read,
 };
 
 #[derive(Debug)]
@@ -24,12 +27,46 @@ impl Machine {
             memory: [0; 4096],
             display: [[0; 64]; 32],
             registers: [0; 16],
-            pc: 0,
+            pc: 0x200,
             index: 0,
             stack: [0; 16],
             sp: 0,
             delay_timer: 0,
             sound_timer: 0,
+        }
+    }
+
+    pub fn init(&mut self, filename: String) {
+        self.load_rom(filename);
+        //self.load_fontset();
+    }
+
+    // TODO: Any way to make this more efficient? 
+    // Possibly read file size => read whole file into buffer at once => extend memory as slice?
+    fn load_rom(&mut self, filename: String) {
+        let mut file = match fs::File::open(filename) {
+            Ok(file) => file,
+            Err(why) => panic!("{}", why),
+        };
+
+        let mut pos = 0;
+        let mut byte: [u8; 1] = [0; 1];
+
+        loop {
+            match file.read_exact(&mut byte) {
+                Ok(_) => {
+                    self.memory[0x200 + pos] = byte[0];
+                }
+
+                Err(ref e) if e.kind() == io::ErrorKind::Interrupted => {
+                    continue;
+                }
+
+                Err(_) => {
+                    break;
+                }
+            }
+            pos += 1;
         }
     }
 
