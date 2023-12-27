@@ -6,7 +6,7 @@ use std::{
     io::Read,
 };
 
-const fontset: [[u8; 5]; 16] {
+const FONTSET: [[u8; 5]; 16] = [
     [0xF0, 0x90, 0x90, 0x90, 0xF0], // 0
     [0x20, 0x60, 0x20, 0x20, 0x70], // 1
     [0xF0, 0x10, 0xF0, 0x80, 0xF0], // 2
@@ -23,7 +23,7 @@ const fontset: [[u8; 5]; 16] {
     [0xE0, 0x90, 0x90, 0x90, 0xE0], // D
     [0xF0, 0x80, 0xF0, 0x80, 0xF0], // E
     [0xF0, 0x80, 0xF0, 0x80, 0x80], // F
-};
+];
 
 
 #[derive(Debug)]
@@ -93,7 +93,7 @@ impl Machine {
     fn load_fontset(&mut self) {
         for sprite in 0..16 {
             for row in 0..5 {
-                self.memory[(sprite * 5) + row] = fontset[sprite][row];
+                self.memory[(sprite * 5) + row] = FONTSET[sprite][row];
             }
         }
     }
