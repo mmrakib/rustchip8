@@ -5,6 +5,7 @@ use std::{
     io,
     io::Read,
 };
+use macroquad::prelude::*;
 
 const FONTSET: [[u8; 5]; 16] = [
     [0xF0, 0x90, 0x90, 0x90, 0xF0], // 0
@@ -25,12 +26,11 @@ const FONTSET: [[u8; 5]; 16] = [
     [0xF0, 0x80, 0xF0, 0x80, 0x80], // F
 ];
 
-
 #[derive(Debug)]
 pub struct Machine {
     opcode: u16,
     memory: [u8; 4096],
-    display: [[u8; 64]; 32], // display[row][col]
+    display: [[u8; 32]; 64], // display[x][y]
     registers: [u8; 16],
     pc: u16,
     index: u16,
@@ -45,7 +45,7 @@ impl Machine {
         Self {
             opcode: 0,
             memory: [0; 4096],
-            display: [[0; 64]; 32],
+            display: [[0; 32]; 64],
             registers: [0; 16],
             pc: 0x200,
             index: 0,
@@ -147,7 +147,7 @@ impl Machine {
             opcode if starts_with(0xA, 1) => time::Duration::from_micros(55),
             opcode if starts_with(0xB, 1) => time::Duration::from_micros(105),
             opcode if starts_with(0xC, 1) => time::Duration::from_micros(164),
-            opcode if starts_with(0xD, 2) => time::Duration::from_micros(2734),
+            opcode if starts_with(0xD, 2) => time::Duration::from_micros(22734),
             opcode if starts_with(0xE, 1) && ends_with(0x9E, 2) => time::Duration::from_micros(73),
             opcode if starts_with(0xE, 1) && ends_with(0xA1, 2) => time::Duration::from_micros(73),
             opcode if starts_with(0xF, 1) && ends_with(0x07, 2) => time::Duration::from_micros(45),
@@ -163,7 +163,7 @@ impl Machine {
         }
     }
 
-    pub fn cycle(&mut self) {
+    fn cycle(&mut self) {
         self.opcode = self.memory[self.pc as usize] as u16 + self.memory[self.pc as usize + 1] as u16;
         self.pc += 1;
 
@@ -173,5 +173,29 @@ impl Machine {
 
         let duration = Self::map_opcode_delay(self.opcode);
         thread::sleep(duration);
+    }
+
+    async fn run(&mut self) {
+        let scale_ratio: f32 = 16.0;
+        request_new_screen_size(64.0 * scale_ratio, 32.0 * scale_ratio);
+
+        loop {
+            clear_background(BLACK);
+
+            self.cycle();
+
+            for x in 0..64 {
+                for y in 0..32 {
+                    if self.display[x][y] != 0 {
+                        let pw: f32 = (screen_width() as f32) / 64.0;
+                        let ph: f32 = (screen_height() as f32) / 32.0;
+    
+                        draw_rectangle(pw * (x as f32), ph * (y as f32), pw as f32, ph as f32, WHITE);
+                    }
+                }
+            }
+
+            next_frame().await;
+        }
     }
 }
