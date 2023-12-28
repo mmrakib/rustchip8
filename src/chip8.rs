@@ -175,7 +175,7 @@ impl Machine {
         thread::sleep(duration);
     }
 
-    async fn run(&mut self) {
+    pub async fn run(&mut self) {
         let scale_ratio: f32 = 16.0;
         request_new_screen_size(64.0 * scale_ratio, 32.0 * scale_ratio);
 
