@@ -4,6 +4,7 @@ use std::{
     fs,
     io,
     io::Read,
+    fmt,
 };
 use macroquad::prelude::*;
 
@@ -26,7 +27,6 @@ const FONTSET: [[u8; 5]; 16] = [
     [0xF0, 0x80, 0xF0, 0x80, 0x80], // F
 ];
 
-#[derive(Debug)]
 pub struct Machine {
     opcode: u16,
     memory: [u8; 4096],
@@ -147,7 +147,7 @@ impl Machine {
             opcode if starts_with(0xA, 1) => time::Duration::from_micros(55),
             opcode if starts_with(0xB, 1) => time::Duration::from_micros(105),
             opcode if starts_with(0xC, 1) => time::Duration::from_micros(164),
-            opcode if starts_with(0xD, 2) => time::Duration::from_micros(22734),
+            opcode if starts_with(0xD, 1) => time::Duration::from_micros(22734),
             opcode if starts_with(0xE, 1) && ends_with(0x9E, 2) => time::Duration::from_micros(73),
             opcode if starts_with(0xE, 1) && ends_with(0xA1, 2) => time::Duration::from_micros(73),
             opcode if starts_with(0xF, 1) && ends_with(0x07, 2) => time::Duration::from_micros(45),
@@ -166,9 +166,40 @@ impl Machine {
     fn cycle(&mut self) {
         self.opcode = self.memory[self.pc as usize] as u16 + self.memory[self.pc as usize + 1] as u16;
         self.pc += 1;
+        let opcode = self.opcode;
 
-        match self.opcode {
-            _ => {}
+        let starts_with = |num, places| -> bool {
+            let mask = match places {
+                1 => 0x000F,
+                2 => 0x00FF,
+                3 => 0x0FFF,
+                4 => 0xFFFF,
+                _ => return false,
+            };
+            let value = (opcode >> (4 * (4 - places))) & mask;
+            if value == num { true } else { false }
+        };
+
+        let ends_with = |num, places| -> bool {
+            let mask = match places {
+                1 => 0x000F,
+                2 => 0x00FF,
+                3 => 0x0FFF,
+                4 => 0xFFFF,
+                _ => return false,
+            };
+            let value = opcode & mask;
+            if value == num { true } else { false }
+        };
+
+        match opcode {
+            0x00E0 => self.op_00e0(),
+            opcode if starts_with(0x1, 1) => self.op_1nnn(),
+            opcode if starts_with(0x6, 1) => self.op_6xnn(),
+            opcode if starts_with(0x7, 1) => self.op_7xnn(),
+            opcode if starts_with(0xA, 1) => self.op_Annn(),
+            opcode if starts_with(0xD, 1) => self.op_Dxyn(),
+            _ => {},
         };
 
         let duration = Self::map_opcode_delay(self.opcode);
@@ -183,6 +214,8 @@ impl Machine {
             clear_background(BLACK);
 
             self.cycle();
+            
+            println!("{}", self);
 
             for x in 0..64 {
                 for y in 0..32 {
@@ -197,5 +230,98 @@ impl Machine {
 
             next_frame().await;
         }
+    }
+
+    /*
+     * Opcodes
+     */
+
+    // Clear screen
+    fn op_00e0(&mut self) {
+        for x in 0..64 {
+            for y in 0..32 {
+                self.display[x][y] = 0x00;
+            }
+        }
+    }
+
+    // Jump to address
+    fn op_1nnn(&mut self) {
+        let addr: u16 = self.opcode & 0x0FFF;
+        self.pc = addr;
+    }
+
+    // Set register to value
+    fn op_6xnn(&mut self) {
+        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let nn: u8 = (self.opcode & 0x00FF) as u8;
+        self.registers[vx as usize] = nn;
+    }
+
+    // Add value to register
+    fn op_7xnn(&mut self) {
+        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let nn: u8 = (self.opcode & 0x00FF) as u8;
+        self.registers[vx as usize] += nn; 
+    }
+
+    // Set index register
+    fn op_Annn(&mut self) {
+        let addr: u16 = self.opcode & 0x0FFF;
+        self.index = addr;
+    }
+
+    // Draw
+    fn op_Dxyn(&mut self) {
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        let vy: usize = ((self.opcode >> 4) & 0x000F) as usize;
+    
+        let x: usize = self.registers[vx] as usize % 64;
+        let y: usize = self.registers[vy] as usize % 32;
+    
+        let height: usize = (self.opcode & 0x000F) as usize;
+    
+        self.registers[0xF] = 0; // Reset collision flag
+    
+        for row in 0..height {
+            let sprite_row = self.memory[(self.index + row as u16) as usize];
+    
+            for col in 0..8 {
+                let sprite_pixel = (sprite_row >> (7 - col)) & 1;
+                let mut display_pixel = &mut self.display[(x + col) % 64][(y + row) % 32];
+    
+                if sprite_pixel == 1 {
+                    if *display_pixel == 1 {
+                        self.registers[0xF] = 1; // Set collision flag
+                    }
+                    *display_pixel ^= 1;
+                }
+            }
+        }
+    }   
+}
+
+impl fmt::Display for Machine {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut output = String::new();
+
+        output.push_str( &format!("opcode: {}\n", self.opcode) );
+        output.push_str( &format!("memory: {:?}\n", self.memory) );
+        output.push_str( &format!("registers: {:?}\n", self.registers) );
+        output.push_str( &format!("pc: {}\n", self.pc) );
+        output.push_str( &format!("index: {}\n", self.index) );
+        output.push_str( &format!("stack: {:?}\n", self.stack) );
+        output.push_str( &format!("sp: {}\n", self.sp) );
+        output.push_str( &format!("delay_timer: {}\n", self.delay_timer) );
+        output.push_str( &format!("sound_timer: {}\n", self.sound_timer) );
+
+        let mut display_str = String::from("display:\n");
+        for x in 0..64 {
+            output.push_str( &format!("{:?}\n", self.display[x]) );
+        }
+
+        write!(f, "{}", output);
+
+        Ok(())
     }
 }
