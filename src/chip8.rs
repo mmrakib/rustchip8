@@ -164,9 +164,14 @@ impl Machine {
     }
 
     fn cycle(&mut self) {
-        self.opcode = self.memory[self.pc as usize] as u16 + self.memory[self.pc as usize + 1] as u16;
-        self.pc += 1;
+        let pc = self.pc as usize;
+
+        let opcode_high_byte = self.memory[pc] as u16;
+        let opcode_low_byte = self.memory[pc + 1] as u16;
+        self.opcode = (opcode_high_byte << 8) | opcode_low_byte;
         let opcode = self.opcode;
+
+        self.pc += 2;
 
         let starts_with = |num, places| -> bool {
             let mask = match places {
@@ -214,15 +219,13 @@ impl Machine {
             clear_background(BLACK);
 
             self.cycle();
-            
-            println!("{}", self);
 
             for x in 0..64 {
                 for y in 0..32 {
                     if self.display[x][y] != 0 {
                         let pw: f32 = (screen_width() as f32) / 64.0;
                         let ph: f32 = (screen_height() as f32) / 32.0;
-    
+            
                         draw_rectangle(pw * (x as f32), ph * (y as f32), pw as f32, ph as f32, WHITE);
                     }
                 }
@@ -288,7 +291,7 @@ impl Machine {
     
             for col in 0..8 {
                 let sprite_pixel = (sprite_row >> (7 - col)) & 1;
-                let mut display_pixel = &mut self.display[(x + col) % 64][(y + row) % 32];
+                let display_pixel = &mut self.display[(x + col) % 64][(y + row) % 32];
     
                 if sprite_pixel == 1 {
                     if *display_pixel == 1 {
@@ -315,12 +318,12 @@ impl fmt::Display for Machine {
         output.push_str( &format!("delay_timer: {}\n", self.delay_timer) );
         output.push_str( &format!("sound_timer: {}\n", self.sound_timer) );
 
-        let mut display_str = String::from("display:\n");
+        let display_str = String::from("display:\n");
         for x in 0..64 {
             output.push_str( &format!("{:?}\n", self.display[x]) );
         }
 
-        write!(f, "{}", output);
+        write!(f, "{}", output)?;
 
         Ok(())
     }
