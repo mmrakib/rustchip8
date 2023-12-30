@@ -5,6 +5,7 @@ use std::{
     io,
     io::Read,
     fmt,
+    rand::Rng,
 };
 use macroquad::prelude::*;
 
@@ -235,11 +236,6 @@ impl Machine {
         }
     }
 
-    /*
-     * Opcodes
-     */
-
-    // Clear screen
     fn op_00e0(&mut self) {
         for x in 0..64 {
             for y in 0..32 {
@@ -248,33 +244,183 @@ impl Machine {
         }
     }
 
-    // Jump to address
+    fn op_00ee(&mut self) {
+        self.pc = self.stack[self.sp as usize];
+        self.sp -= 1;
+    }
+
     fn op_1nnn(&mut self) {
         let addr: u16 = self.opcode & 0x0FFF;
         self.pc = addr;
     }
 
-    // Set register to value
+    fn op_2nnn(&mut self) {
+        let addr: u16 = self.opcode & 0x0FFF;
+        self.sp += 1;
+        self.stack[self.sp as usize] = self.pc;
+        self.pc = addr;
+    }
+
+    fn op_3xnn(&mut self) {
+        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let nn: u8 = (self.opcode & 0x00FF) as u8;
+
+        if self.registers[vx as usize] == nn {
+            self.pc += 2;
+        }
+    }
+
+    fn op_4xnn(&mut self) {
+        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let nn: u8 = (self.opcode & 0x00FF) as u8;
+
+        if self.registers[vx as usize] != nn {
+            self.pc += 2;
+        }
+    }
+
+    fn op_5xy0(&mut self) {
+        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
+
+        if self.registers[vx as usize] == self.registers[vy as usize] {
+            self.pc += 2;
+        }
+    }
+
     fn op_6xnn(&mut self) {
         let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
         let nn: u8 = (self.opcode & 0x00FF) as u8;
+
         self.registers[vx as usize] = nn;
     }
 
-    // Add value to register
     fn op_7xnn(&mut self) {
         let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
         let nn: u8 = (self.opcode & 0x00FF) as u8;
+
         self.registers[vx as usize] += nn; 
     }
 
-    // Set index register
+    fn op_8xy0(&mut self) {
+        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
+
+        self.registers[vx as usize] = self.registers[vy as usize];
+    }
+
+    fn op_8xy1(&mut self) {
+        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
+
+        self.registers[vx as usize] |= self.registers[vy as usize];
+    }
+
+    fn op_8xy2(&mut self) {
+        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
+
+        self.registers[vx as usize] &= self.registers[vy as usize];
+    }
+
+    fn op_8xy3(&mut self) {
+        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
+        self.registers[vx as usize] ^= self.registers[vy as usize];
+    }
+
+    fn op_8xy4(&mut self) {
+        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
+
+        if (self.registers[vx as usize] + self.registers[vy as usize]) as u32 > 255 as u32 {
+            self.registers[0xF] = 1;
+        } else {
+            self.registers[0xF] = 0;
+        }
+
+        self.registers[vx as usize] += self.registers[vy as usize] & 0xFF;
+    }
+
+    fn op_8xy5(&mut self) {
+        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
+
+        if self.registers[vx as usize] > self.registers[vy as usize] {
+            self.registers[0xF] = 1;
+        } else {
+            self.registers[0xF] = 0;
+        }
+
+        self.registers[vx as usize] -= self.registers[vy as usize];
+    }
+
+    fn op_8xy6(&mut self) {
+        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+
+        if (self.registers[vx as usize] & 0x01 == 1) {
+            self.registers[0xF] = 1;
+        } else {
+            self.registers[0xF] = 0;
+        }
+
+        self.registers[vx as usize] >>= 1;
+    }
+
+    fn op_8xy7(&mut self) {
+        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
+
+        if self.registers[vx as usize] > self.registers[vy as usize] {
+            self.registers[0xF] = 1;
+        } else {
+            self.registers[0xF] = 0;
+        }
+
+        self.registers[vx as usize] = self.registers[vy as usize] - self.registers[vx as usize];
+    }
+
+    fn op_8xyE(&mut self) {
+        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+
+        if (self.registers[vx as usize] & 0x80 == 1) {
+            self.registers[0xF] = 1;
+        } else {
+            self.registers[0xF] = 0;
+        }
+
+        self.registers[vx as usize] <<= 1;
+    }
+
+    fn op_9xy0(&mut self) {
+        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
+
+        if (self.registers[vx as usize] != self.registers[vy as usize]) {
+            self.pc += 2;
+        }
+    }
+
     fn op_Annn(&mut self) {
         let addr: u16 = self.opcode & 0x0FFF;
         self.index = addr;
     }
 
-    // Draw
+    fn op_Bnnn(&mut self) {
+        let addr: u16 = self.opcode & 0x0FFF;
+        self.pc = addr + (self.registers[0x0] as u16);
+    }
+
+    fn op_Cxnn(&mut self) {
+        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let nn: u8 = (self.opcode & 0x00FF) as u8;
+
+        let mut rng = rand::thread_rng();
+        let rand_byte = rng.gen_range(0..256);
+
+        self.registers[vx as usize] = rand_byte & nn;
+    }
+
     fn op_Dxyn(&mut self) {
         let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
         let vy: usize = ((self.opcode >> 4) & 0x000F) as usize;
@@ -284,7 +430,7 @@ impl Machine {
     
         let height: usize = (self.opcode & 0x000F) as usize;
     
-        self.registers[0xF] = 0; // Reset collision flag
+        self.registers[0xF] = 0;
     
         for row in 0..height {
             let sprite_row = self.memory[(self.index + row as u16) as usize];
@@ -295,13 +441,17 @@ impl Machine {
     
                 if sprite_pixel == 1 {
                     if *display_pixel == 1 {
-                        self.registers[0xF] = 1; // Set collision flag
+                        self.registers[0xF] = 1;
                     }
                     *display_pixel ^= 1;
                 }
             }
         }
-    }   
+    }
+
+    fn op_Ex9E() {
+        
+    }
 }
 
 impl fmt::Display for Machine {
