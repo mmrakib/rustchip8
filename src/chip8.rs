@@ -5,7 +5,6 @@ use std::{
     io,
     io::Read,
     fmt,
-    rand::Rng,
 };
 use macroquad::prelude::*;
 
@@ -358,7 +357,7 @@ impl Machine {
     fn op_8xy6(&mut self) {
         let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
 
-        if (self.registers[vx as usize] & 0x01 == 1) {
+        if self.registers[vx as usize] & 0x01 == 1 {
             self.registers[0xF] = 1;
         } else {
             self.registers[0xF] = 0;
@@ -383,7 +382,7 @@ impl Machine {
     fn op_8xyE(&mut self) {
         let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
 
-        if (self.registers[vx as usize] & 0x80 == 1) {
+        if self.registers[vx as usize] & 0x80 == 1 {
             self.registers[0xF] = 1;
         } else {
             self.registers[0xF] = 0;
@@ -396,7 +395,7 @@ impl Machine {
         let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
         let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
 
-        if (self.registers[vx as usize] != self.registers[vy as usize]) {
+        if self.registers[vx as usize] != self.registers[vy as usize] {
             self.pc += 2;
         }
     }
@@ -415,8 +414,7 @@ impl Machine {
         let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
         let nn: u8 = (self.opcode & 0x00FF) as u8;
 
-        let mut rng = rand::thread_rng();
-        let rand_byte = rng.gen_range(0..256);
+        let rand_byte = macroquad::rand::gen_range(0, 255);
 
         self.registers[vx as usize] = rand_byte & nn;
     }
@@ -450,7 +448,7 @@ impl Machine {
     }
 
     fn op_Ex9E() {
-        
+
     }
 }
 
