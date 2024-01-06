@@ -324,83 +324,87 @@ impl Machine {
 
     fn op_1nnn(&mut self) {
         let addr: u16 = self.opcode & 0x0FFF;
+
         self.pc = addr;
     }
 
     fn op_2nnn(&mut self) {
         let addr: u16 = self.opcode & 0x0FFF;
+
         self.sp += 1;
         self.stack[self.sp as usize] = self.pc;
         self.pc = addr;
     }
 
     fn op_3xnn(&mut self) {
-        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
         let nn: u8 = (self.opcode & 0x00FF) as u8;
 
-        if self.registers[vx as usize] == nn {
+        if self.registers[vx] == nn {
             self.pc += 2;
         }
     }
 
     fn op_4xnn(&mut self) {
-        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
         let nn: u8 = (self.opcode & 0x00FF) as u8;
 
-        if self.registers[vx as usize] != nn {
+        if self.registers[vx] != nn {
             self.pc += 2;
         }
     }
 
     fn op_5xy0(&mut self) {
-        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
-        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        let vy: usize = ((self.opcode >> 4) & 0x000F) as usize;
 
-        if self.registers[vx as usize] == self.registers[vy as usize] {
+        if self.registers[vx] == self.registers[vy] {
             self.pc += 2;
         }
     }
 
     fn op_6xnn(&mut self) {
-        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
         let nn: u8 = (self.opcode & 0x00FF) as u8;
 
-        self.registers[vx as usize] = nn;
+        self.registers[vx] = nn;
     }
 
     fn op_7xnn(&mut self) {
-        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
         let nn: u8 = (self.opcode & 0x00FF) as u8;
 
-        let value = self.registers[vx as usize];
-        self.registers[vx as usize] = value.wrapping_add(nn);
+        let value = self.registers[vx];
+
+        self.registers[vx] = value.wrapping_add(nn);
     }
 
     fn op_8xy0(&mut self) {
-        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
-        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        let vy: usize = ((self.opcode >> 4) & 0x000F) as usize;
 
-        self.registers[vx as usize] = self.registers[vy as usize];
+        self.registers[vx] = self.registers[vy];
     }
 
     fn op_8xy1(&mut self) {
-        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
-        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        let vy: usize = ((self.opcode >> 4) & 0x000F) as usize;
 
-        self.registers[vx as usize] |= self.registers[vy as usize];
+        self.registers[vx] |= self.registers[vy];
     }
 
     fn op_8xy2(&mut self) {
-        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
-        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        let vy: usize = ((self.opcode >> 4) & 0x000F) as usize;
 
-        self.registers[vx as usize] &= self.registers[vy as usize];
+        self.registers[vx] &= self.registers[vy];
     }
 
     fn op_8xy3(&mut self) {
-        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
-        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
-        self.registers[vx as usize] ^= self.registers[vy as usize];
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        let vy: usize = ((self.opcode >> 4) & 0x000F) as usize;
+
+        self.registers[vx] ^= self.registers[vy];
     }
 
     fn op_8xy4(&mut self) {
@@ -432,9 +436,9 @@ impl Machine {
     }
 
     fn op_8xy6(&mut self) {
-        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
 
-        if self.registers[vx as usize] & 0x01 == 1 {
+        if self.registers[vx] & 0x01 == 1 {
             self.registers[0xF] = 1;
         } else {
             self.registers[0xF] = 0;
@@ -457,9 +461,9 @@ impl Machine {
     }
 
     fn op_8xyE(&mut self) {
-        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
 
-        if self.registers[vx as usize] & 0x80 == 1 {
+        if self.registers[vx] & 0x80 == 1 {
             self.registers[0xF] = 1;
         } else {
             self.registers[0xF] = 0;
@@ -469,31 +473,33 @@ impl Machine {
     }
 
     fn op_9xy0(&mut self) {
-        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
-        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        let vy: usize = ((self.opcode >> 4) & 0x000F) as usize;
 
-        if self.registers[vx as usize] != self.registers[vy as usize] {
+        if self.registers[vx] != self.registers[vy] {
             self.pc += 2;
         }
     }
 
     fn op_Annn(&mut self) {
         let addr: u16 = self.opcode & 0x0FFF;
+
         self.index = addr;
     }
 
     fn op_Bnnn(&mut self) {
         let addr: u16 = self.opcode & 0x0FFF;
+
         self.pc = addr + (self.registers[0x0] as u16);
     }
 
     fn op_Cxnn(&mut self) {
-        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
         let nn: u8 = (self.opcode & 0x00FF) as u8;
 
         let rand_byte = macroquad::rand::gen_range(0, 255);
 
-        self.registers[vx as usize] = rand_byte & nn;
+        self.registers[vx] = rand_byte & nn;
     }
 
     fn op_Dxyn(&mut self) {
