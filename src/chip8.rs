@@ -245,12 +245,40 @@ impl Machine {
 
         match opcode {
             0x00E0 => self.op_00e0(),
+            0x00EE => self.op_00ee(),
             opcode if starts_with(0x1, 1) => self.op_1nnn(),
+            opcode if starts_with(0x2, 1) => self.op_2nnn(),
+            opcode if starts_with(0x3, 1) => self.op_3xnn(),
+            opcode if starts_with(0x4, 1) => self.op_4xnn(),
+            opcode if starts_with(0x5, 1) => self.op_5xy0(),
             opcode if starts_with(0x6, 1) => self.op_6xnn(),
             opcode if starts_with(0x7, 1) => self.op_7xnn(),
+            opcode if starts_with(0x8, 1) && ends_with(0x0, 1) => self.op_8xy0(),
+            opcode if starts_with(0x8, 1) && ends_with(0x1, 1) => self.op_8xy1(),
+            opcode if starts_with(0x8, 1) && ends_with(0x2, 1) => self.op_8xy2(),
+            opcode if starts_with(0x8, 1) && ends_with(0x3, 1) => self.op_8xy3(),
+            opcode if starts_with(0x8, 1) && ends_with(0x4, 1) => self.op_8xy4(),
+            opcode if starts_with(0x8, 1) && ends_with(0x5, 1) => self.op_8xy5(),
+            opcode if starts_with(0x8, 1) && ends_with(0x6, 1) => self.op_8xy6(),
+            opcode if starts_with(0x8, 1) && ends_with(0x7, 1) => self.op_8xy7(),
+            opcode if starts_with(0x8, 1) && ends_with(0xE, 1) => self.op_8xyE(),
+            opcode if starts_with(0x9, 1) => self.op_9xy0(),
             opcode if starts_with(0xA, 1) => self.op_Annn(),
+            opcode if starts_with(0xB, 1) => self.op_Bnnn(),
+            opcode if starts_with(0xC, 1) => self.op_Cxnn(),
             opcode if starts_with(0xD, 1) => self.op_Dxyn(),
-            _ => {},
+            opcode if starts_with(0xE, 1) && ends_with(0x9E, 2) => self.op_Ex9E(),
+            opcode if starts_with(0xE, 1) && ends_with(0xA1, 2) => self.op_ExA1(),
+            opcode if starts_with(0xF, 1) && ends_with(0x07, 2) => self.op_Fx07(),
+            opcode if starts_with(0xF, 1) && ends_with(0x0A, 2) => self.op_Fx0A(),
+            opcode if starts_with(0xF, 1) && ends_with(0x15, 2) => self.op_Fx15(),
+            opcode if starts_with(0xF, 1) && ends_with(0x18, 2) => self.op_Fx18(),
+            opcode if starts_with(0xF, 1) && ends_with(0x1E, 2) => self.op_Fx1E(),
+            opcode if starts_with(0xF, 1) && ends_with(0x29, 2) => self.op_Fx29(),
+            opcode if starts_with(0xF, 1) && ends_with(0x33, 2) => self.op_Fx33(),
+            opcode if starts_with(0xF, 1) && ends_with(0x55, 2) => self.op_Fx55(),
+            opcode if starts_with(0xF, 1) && ends_with(0x65, 2) => self.op_Fx65(),
+            _ => panic!("Invalid opcode"),
         };
 
         let duration = Self::map_opcode_delay(self.opcode);
@@ -376,29 +404,31 @@ impl Machine {
     }
 
     fn op_8xy4(&mut self) {
-        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
-        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
-
-        if (self.registers[vx as usize] + self.registers[vy as usize]) as u32 > 255 as u32 {
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        let vy: usize = ((self.opcode >> 4) & 0x000F) as usize;
+    
+        let sum: u16 = self.registers[vx] as u16 + self.registers[vy] as u16;
+        
+        if sum > 255 {
             self.registers[0xF] = 1;
         } else {
             self.registers[0xF] = 0;
         }
-
-        self.registers[vx as usize] += self.registers[vy as usize] & 0xFF;
+    
+        self.registers[vx] = (sum & 0xFF) as u8;
     }
-
+    
     fn op_8xy5(&mut self) {
-        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
-        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
-
-        if self.registers[vx as usize] > self.registers[vy as usize] {
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        let vy: usize = ((self.opcode >> 4) & 0x000F) as usize;
+    
+        if self.registers[vx] >= self.registers[vy] {
             self.registers[0xF] = 1;
         } else {
             self.registers[0xF] = 0;
         }
-
-        self.registers[vx as usize] -= self.registers[vy as usize];
+    
+        self.registers[vx] = self.registers[vx].wrapping_sub(self.registers[vy]);
     }
 
     fn op_8xy6(&mut self) {
@@ -414,16 +444,16 @@ impl Machine {
     }
 
     fn op_8xy7(&mut self) {
-        let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
-        let vy: u8 = ((self.opcode >> 4) & 0x000F) as u8;
-
-        if self.registers[vx as usize] > self.registers[vy as usize] {
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        let vy: usize = ((self.opcode >> 4) & 0x000F) as usize;
+    
+        if self.registers[vy] > self.registers[vx] {
             self.registers[0xF] = 1;
         } else {
             self.registers[0xF] = 0;
         }
-
-        self.registers[vx as usize] = self.registers[vy as usize] - self.registers[vx as usize];
+    
+        self.registers[vx] = self.registers[vy].wrapping_sub(self.registers[vx]);
     }
 
     fn op_8xyE(&mut self) {
@@ -539,7 +569,15 @@ impl Machine {
 
     fn op_Fx1E(&mut self) {
         let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
-        self.index += self.registers[vx] as u16;
+        let sum = self.index + self.registers[vx] as u16;
+
+        if sum > 0xFFF {
+            self.registers[0xF] = 1;
+        } else {
+            self.registers[0xF] = 0;
+        }
+
+        self.index = sum;
     }
 
     fn op_Fx29(&mut self) {
