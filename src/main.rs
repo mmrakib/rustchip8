@@ -13,6 +13,6 @@ use crate::chip8::Machine;
 #[main("Chip8")]
 async fn main() {
     let mut m: Machine = Machine::new();
-    m.init(String::from("IBMLogo.ch8"));
+    m.init(String::from("roms/corax.ch8"));
     m.run().await;
 }

@@ -98,6 +98,52 @@ impl Machine {
         }
     }
 
+    fn map_key_to_keyboard(keycode: u8) -> macroquad::input::KeyCode {
+        use macroquad::input::KeyCode;
+        match keycode {
+            0x1 => KeyCode::Key1,
+            0x2 => KeyCode::Key2,
+            0x3 => KeyCode::Key3,
+            0xC => KeyCode::Key4,
+            0x4 => KeyCode::Q,
+            0x5 => KeyCode::W,
+            0x6 => KeyCode::E,
+            0xD => KeyCode::R,
+            0x7 => KeyCode::A,
+            0x8 => KeyCode::S,
+            0x9 => KeyCode::D,
+            0xE => KeyCode::F,
+            0xA => KeyCode::Z,
+            0x0 => KeyCode::X,
+            0xB => KeyCode::C,
+            0xF => KeyCode::V,
+            _ => panic!("Incorrect key to map"),
+        }
+    }
+
+    fn map_key_from_keyboard(keycode: macroquad::input::KeyCode) -> u8 {
+        use macroquad::input::KeyCode;
+        match keycode {
+            KeyCode::Key1 => 0x1,
+            KeyCode::Key2 => 0x2,
+            KeyCode::Key3 => 0x3,
+            KeyCode::Key4 => 0xC,
+            KeyCode::Q => 0x4,
+            KeyCode::W => 0x5,
+            KeyCode::E => 0x6,
+            KeyCode::R => 0xD,
+            KeyCode::A => 0x7,
+            KeyCode::S => 0x8,
+            KeyCode::D => 0x9,
+            KeyCode::F => 0xE,
+            KeyCode::Z => 0xA,
+            KeyCode::X => 0x0,
+            KeyCode::C => 0xB, 
+            KeyCode::V => 0xF,
+            _ => panic!("Incorrect key to map"),
+        }
+    }
+
     fn map_opcode_delay(opcode: u16) -> time::Duration {
         let starts_with = |num, places| -> bool {
             let mask = match places {
@@ -298,7 +344,8 @@ impl Machine {
         let vx: u8 = ((self.opcode >> 8) & 0x000F) as u8;
         let nn: u8 = (self.opcode & 0x00FF) as u8;
 
-        self.registers[vx as usize] += nn; 
+        let value = self.registers[vx as usize];
+        self.registers[vx as usize] = value.wrapping_add(nn);
     }
 
     fn op_8xy0(&mut self) {
@@ -447,8 +494,82 @@ impl Machine {
         }
     }
 
-    fn op_Ex9E() {
+    fn op_Ex9E(&mut self) {
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        let keycode: u8 = self.registers[vx];
+
+        if macroquad::input::is_key_down( Machine::map_key_to_keyboard(keycode) ) {
+            self.pc += 2;
+        }
+    }
+
+    fn op_ExA1(&mut self) {
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        let keycode: u8 = self.registers[vx];
+
+        if !macroquad::input::is_key_down( Machine::map_key_to_keyboard(keycode) ) {
+            self.pc += 2;
+        }
+    }
+
+    fn op_Fx07(&mut self) {
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        self.registers[vx] = self.delay_timer;
+    }
+
+    fn op_Fx0A(&mut self) {
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        let keycode: u8 = self.registers[vx];
+
+        // Blocks and polls input at 500 Hz
+        while !macroquad::input::is_key_down( Machine::map_key_to_keyboard(keycode) ) {
+            thread::sleep(time::Duration::from_millis(2));
+        }
+    }
+
+    fn op_Fx15(&mut self) {
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        self.delay_timer = self.registers[vx];
+    }
+
+    fn op_Fx18(&mut self) {
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        self.sound_timer = self.registers[vx];
+    }
+
+    fn op_Fx1E(&mut self) {
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        self.index += self.registers[vx] as u16;
+    }
+
+    fn op_Fx29(&mut self) {
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        self.index = (self.registers[vx] * 5) as u16;
+    }
+
+    fn op_Fx33(&mut self) {
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+        let value: u8 = self.registers[vx];
         
+        self.memory[(self.index) as usize] = (value / 100) % 10;
+        self.memory[(self.index + 1) as usize] = (value / 10) % 10;
+        self.memory[(self.index + 2) as usize] = value % 10;
+    }
+
+    fn op_Fx55(&mut self) {
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+
+        for reg in 0..=vx {
+            self.memory[(self.index as usize + reg) as usize] = self.registers[reg];
+        }
+    }
+
+    fn op_Fx65(&mut self) {
+        let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
+
+        for reg in 0..=vx {
+            self.registers[reg] = self.memory[(self.index as usize + reg) as usize];
+        }
     }
 }
 
