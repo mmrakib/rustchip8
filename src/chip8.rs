@@ -29,6 +29,7 @@ const FONTSET: [[u8; 5]; 16] = [
 
 pub struct Machine {
     opcode: u16,
+    keypad: [bool; 16],
     memory: [u8; 4096],
     display: [[u8; 32]; 64], // display[x][y]
     registers: [u8; 16],
@@ -44,6 +45,7 @@ impl Machine {
     pub fn new() -> Self {
         Self {
             opcode: 0,
+            keypad: [false; 16],
             memory: [0; 4096],
             display: [[0; 32]; 64],
             registers: [0; 16],
@@ -209,6 +211,113 @@ impl Machine {
         }
     }
 
+    fn process_input(&mut self) {
+        use macroquad::input::KeyCode;
+
+        /* 
+        KeyCode::Z => 0xA,
+        KeyCode::X => 0x0,
+        KeyCode::C => 0xB, 
+        KeyCode::V => 0xF,
+        */
+
+        if macroquad::input::is_key_down( KeyCode::Key1 ) {
+            self.keypad[0x1] = true;
+        } else {
+            self.keypad[0x1] = false;
+        }
+
+        if macroquad::input::is_key_down( KeyCode::Key2 ) {
+            self.keypad[0x2] = true;
+        } else {
+            self.keypad[0x2] = false;
+        }
+
+        if macroquad::input::is_key_down( KeyCode::Key3 ) {
+            self.keypad[0x3] = true;
+        } else {
+            self.keypad[0x3] = false;
+        }
+
+        if macroquad::input::is_key_down( KeyCode::Key4 ) {
+            self.keypad[0xC] = true;
+        } else {
+            self.keypad[0xC] = false;
+        }
+
+        if macroquad::input::is_key_down( KeyCode::Q ) {
+            self.keypad[0x4] = true;
+        } else {
+            self.keypad[0x4] = false;
+        }
+
+        if macroquad::input::is_key_down( KeyCode::W ) {
+            self.keypad[0x5] = true;
+        } else {
+            self.keypad[0x5] = false;
+        }
+
+        if macroquad::input::is_key_down( KeyCode::E ) {
+            self.keypad[0x6] = true;
+        } else {
+            self.keypad[0x6] = false;
+        }
+
+        if macroquad::input::is_key_down( KeyCode::R ) {
+            self.keypad[0xD] = true;
+        } else {
+            self.keypad[0xD] = false;
+        }
+
+        if macroquad::input::is_key_down( KeyCode::A ) {
+            self.keypad[0x7] = true;
+        } else {
+            self.keypad[0x7] = false;
+        }
+
+        if macroquad::input::is_key_down( KeyCode::S ) {
+            self.keypad[0x8] = true;
+        } else {
+            self.keypad[0x8] = false;
+        }
+
+        if macroquad::input::is_key_down( KeyCode::D ) {
+            self.keypad[0x9] = true;
+        } else {
+            self.keypad[0x9] = false;
+        }
+
+        if macroquad::input::is_key_down( KeyCode::F ) {
+            self.keypad[0xE] = true;
+        } else {
+            self.keypad[0xE] = false;
+        }
+
+        if macroquad::input::is_key_down( KeyCode::Z ) {
+            self.keypad[0xA] = true;
+        } else {
+            self.keypad[0xA] = false;
+        }
+
+        if macroquad::input::is_key_down( KeyCode::X ) {
+            self.keypad[0x0] = true;
+        } else {
+            self.keypad[0x0] = false;
+        }
+
+        if macroquad::input::is_key_down( KeyCode::C ) {
+            self.keypad[0xB] = true;
+        } else {
+            self.keypad[0xB] = false;
+        }
+
+        if macroquad::input::is_key_down( KeyCode::V ) {
+            self.keypad[0xF] = true;
+        } else {
+            self.keypad[0xF] = false;
+        }
+    }
+
     fn cycle(&mut self) {
         let pc = self.pc as usize;
 
@@ -242,6 +351,8 @@ impl Machine {
             let value = opcode & mask;
             if value == num { true } else { false }
         };
+
+        self.process_input();
 
         match opcode {
             0x00E0 => self.op_00e0(),
@@ -437,21 +548,21 @@ impl Machine {
 
     fn op_8xy6(&mut self) {
         let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
-
-        if self.registers[vx] & 0x01 == 1 {
+    
+        if self.registers[vx] & 0x01 != 0 {
             self.registers[0xF] = 1;
         } else {
             self.registers[0xF] = 0;
         }
-
-        self.registers[vx as usize] >>= 1;
-    }
+    
+        self.registers[vx] >>= 1;
+    }    
 
     fn op_8xy7(&mut self) {
         let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
         let vy: usize = ((self.opcode >> 4) & 0x000F) as usize;
     
-        if self.registers[vy] > self.registers[vx] {
+        if self.registers[vy] >= self.registers[vx] {
             self.registers[0xF] = 1;
         } else {
             self.registers[0xF] = 0;
@@ -462,15 +573,15 @@ impl Machine {
 
     fn op_8xyE(&mut self) {
         let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
-
-        if self.registers[vx] & 0x80 == 1 {
+    
+        if self.registers[vx] & 0x80 != 0 {
             self.registers[0xF] = 1;
         } else {
             self.registers[0xF] = 0;
         }
-
-        self.registers[vx as usize] <<= 1;
-    }
+    
+        self.registers[vx] <<= 1;
+    }    
 
     fn op_9xy0(&mut self) {
         let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
@@ -534,7 +645,7 @@ impl Machine {
         let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
         let keycode: u8 = self.registers[vx];
 
-        if macroquad::input::is_key_down( Machine::map_key_to_keyboard(keycode) ) {
+        if self.keypad[keycode as usize] == true  {
             self.pc += 2;
         }
     }
@@ -543,7 +654,7 @@ impl Machine {
         let vx: usize = ((self.opcode >> 8) & 0x000F) as usize;
         let keycode: u8 = self.registers[vx];
 
-        if !macroquad::input::is_key_down( Machine::map_key_to_keyboard(keycode) ) {
+        if self.keypad[keycode as usize] == false {
             self.pc += 2;
         }
     }
@@ -558,7 +669,7 @@ impl Machine {
         let keycode: u8 = self.registers[vx];
 
         // Blocks and polls input at 500 Hz
-        while !macroquad::input::is_key_down( Machine::map_key_to_keyboard(keycode) ) {
+        while self.keypad[keycode as usize] == false {
             thread::sleep(time::Duration::from_millis(2));
         }
     }
