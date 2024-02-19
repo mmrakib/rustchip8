@@ -214,13 +214,6 @@ impl Machine {
     fn process_input(&mut self) {
         use macroquad::input::KeyCode;
 
-        /* 
-        KeyCode::Z => 0xA,
-        KeyCode::X => 0x0,
-        KeyCode::C => 0xB, 
-        KeyCode::V => 0xF,
-        */
-
         if macroquad::input::is_key_down( KeyCode::Key1 ) {
             self.keypad[0x1] = true;
         } else {
@@ -352,8 +345,6 @@ impl Machine {
             if value == num { true } else { false }
         };
 
-        self.process_input();
-
         match opcode {
             0x00E0 => self.op_00e0(),
             0x00EE => self.op_00ee(),
@@ -402,6 +393,8 @@ impl Machine {
 
         loop {
             clear_background(BLACK);
+
+            self.process_input();
 
             self.cycle();
 
